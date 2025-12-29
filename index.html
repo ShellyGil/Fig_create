@@ -9,39 +9,52 @@
         :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
         body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1400px; margin: 0 auto; }
         
-        /* Layout */
         .app-container { display: flex; gap: 20px; flex-direction: column; }
         .panel { background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
-        
-        /* Setup Controls */
-        .config-row { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        h2 { margin-top:0; font-size:18px; color: #334155; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 15px; }
+        h3 { margin: 15px 0 10px 0; font-size: 14px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        /* Configuration Flex layout */
+        .config-row { display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
+        .config-section { border-right: 1px solid #eee; padding-right: 15px; margin-right: 5px; display: flex; gap: 15px; }
+        .config-section:last-child { border-right: none; }
+
         .input-group { display: flex; flex-direction: column; gap: 5px; }
         .input-group label { font-size: 12px; font-weight: bold; color: #64748b; }
-        input[type="number"], input[type="text"], select { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; }
         
-        button { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
-        button:hover { opacity: 0.9; }
+        /* Inputs */
+        input[type="number"], input[type="text"], select { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; font-family: inherit; }
+        input[type="color"] { padding: 2px; height: 30px; width: 50px; border: 1px solid #cbd5e1; border-radius: 4px; cursor: pointer; }
+
+        /* Buttons */
+        button { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; font-family: inherit; transition: 0.2s; }
+        button:hover { opacity: 0.9; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
         button.secondary { background: #64748b; }
+        button.destructive { background: #fff; color: #ef4444; border: 1px solid #ef4444; }
+        button.destructive:hover { background: #fef2f2; }
         
-        /* The Grid */
+        /* File Grid */
         #dynamic-grid { display: grid; gap: 10px; margin-top: 20px; align-items: center; }
-        .file-drop { border: 2px dashed #cbd5e1; padding: 10px; text-align: center; border-radius: 4px; font-size: 11px; cursor: pointer; background: #fdfdfd; transition: 0.2s; position: relative; overflow: hidden; }
-        .file-drop:hover { border-color: var(--primary); background: #eff6ff; }
+        .file-drop { border: 2px dashed #cbd5e1; padding: 10px; text-align: center; border-radius: 4px; font-size: 11px; cursor: pointer; background: #fdfdfd; transition: 0.2s; position: relative; overflow: hidden; height: 40px; display: flex; align-items: center; justify-content: center; font-weight: 500; color: #64748b; }
+        .file-drop:hover { border-color: var(--primary); background: #eff6ff; color: var(--primary); }
         .file-drop input { opacity: 0; position: absolute; top:0; left:0; width:100%; height:100%; cursor: pointer; }
-        .file-drop.has-file { background: #dcfce7; border-color: #22c55e; border-style: solid; }
+        .file-drop.has-file { background: #dcfce7; border-color: #22c55e; border-style: solid; color: #166534; }
 
         /* Canvas */
-        #canvas-wrapper { overflow: auto; text-align: center; background: #eee; padding: 20px; border-radius: 4px; min-height: 300px; display: flex; align-items: center; justify-content: center; }
-        canvas { box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 100%; }
-
+        #canvas-wrapper { overflow: auto; text-align: center; background: #e5e7eb; padding: 20px; border-radius: 4px; min-height: 300px; display: flex; align-items: center; justify-content: center; border: 2px solid #eee; }
+        canvas { box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); max-width: 100%; background: white; }
         .loading { display: none; margin-left: 10px; color: var(--primary); font-weight: bold; }
+        
+        /* Toggle Switch Style */
+        .toggle-wrapper { display: flex; align-items: center; gap: 8px; background: #f1f5f9; padding: 6px 12px; border-radius: 20px; border: 1px solid #e2e8f0; height: 18px; }
+        .toggle-wrapper input { margin: 0; cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div class="app-container">
         <div class="panel">
-            <h2 style="margin-top:0">1. Figure Layout</h2>
+            <h2>1. Setup Grid Dimensions</h2>
             <div class="config-row">
                 <div class="input-group">
                     <label>Columns (Time)</label>
@@ -51,39 +64,72 @@
                     <label>Rows (Channels)</label>
                     <input type="number" id="num-rows" value="2" min="1" max="6" style="width:60px">
                 </div>
-                <div class="input-group">
-                    <label>Options</label>
-                    <div style="display:flex; align-items:center; gap:5px; height: 30px;">
-                        <input type="checkbox" id="include-merge" checked> <span style="font-size:14px">Include Merge Row</span>
-                    </div>
-                </div>
-                <button onclick="buildGridUI()">Update Grid</button>
-            </div>
-
-            <div class="config-row" style="border-top: 1px solid #eee; padding-top: 15px;">
-                <div class="input-group">
-                    <label>Scale Bar (µm)</label>
-                    <input type="number" id="scale-um" value="100" style="width:80px">
-                </div>
-                <div class="input-group">
-                    <label>Px per µm</label>
-                    <input type="number" id="px-per-um" value="2.5" style="width:80px">
-                </div>
-                <div class="input-group">
-                    <label>Figure Label</label>
-                    <input type="text" id="fig-label" value="B" style="width:50px">
-                </div>
-                <div style="margin-left: auto;">
-                    <button onclick="generateFigure()">Generate Figure</button>
-                    <button class="secondary" onclick="downloadFigure()">Download PNG</button>
-                    <span id="loading-msg" class="loading">Processing...</span>
-                </div>
+                <button class="destructive" onclick="buildGridUI()">Reset & Create Grid</button>
             </div>
         </div>
 
         <div class="panel" id="grid-panel" style="display:none;">
-            <h2 style="margin-top:0">2. Upload Data</h2>
+            <h2>2. Upload Images & Configure Channels</h2>
             <div id="dynamic-grid"></div>
+        </div>
+
+        <div class="panel" id="options-panel" style="display:none;">
+            <h2>3. Figure Options</h2>
+            <div class="config-row" style="align-items: flex-start;">
+                
+                <div style="flex: 1;">
+                    <h3>Layout & Scale</h3>
+                    <div class="config-row">
+                        <div class="input-group">
+                            <label>Merge Row</label>
+                            <div class="toggle-wrapper">
+                                <input type="checkbox" id="include-merge" checked> 
+                                <span style="font-size:13px; font-weight:600; color: #475569;">Include</span>
+                            </div>
+                        </div>
+                        <div class="input-group">
+                            <label>Scale Bar (µm)</label>
+                            <input type="number" id="scale-um" value="100" style="width:70px">
+                        </div>
+                        <div class="input-group">
+                            <label>Px per µm</label>
+                            <input type="number" id="px-per-um" value="2.5" step="0.1" style="width:70px">
+                        </div>
+                        <div class="input-group">
+                            <label>Main Label</label>
+                            <input type="text" id="fig-label" value="B" style="width:40px; text-align: center;">
+                        </div>
+                    </div>
+                </div>
+
+                <div style="flex: 1; border-left: 2px solid #eee; padding-left: 20px;">
+                    <h3>Appearance Settings</h3>
+                    <div class="config-row">
+                        <div class="input-group">
+                            <label>Header Font Size</label>
+                            <input type="number" id="fs-header" value="48" style="width:60px" title="Size for column headers and main label 'B'">
+                        </div>
+                         <div class="input-group">
+                            <label>Label Font Size</label>
+                            <input type="number" id="fs-label" value="36" style="width:60px" title="Size for text inside images">
+                        </div>
+                        <div class="input-group">
+                            <label>Bar Color</label>
+                            <input type="color" id="sb-color" value="#ffff00">
+                        </div>
+                         <div class="input-group">
+                            <label>Bar Height (%)</label>
+                            <input type="number" id="sb-height" value="3" min="1" max="20" style="width:60px" title="Thickness relative to image height">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 2px solid #eee; display: flex; justify-content: flex-end; align-items: center;">
+                 <span id="loading-msg" class="loading" style="margin-right: 15px;">Processing large images... please wait...</span>
+                <button onclick="generateFigure()" style="font-size: 16px; padding: 12px 24px;">Generate Figure</button>
+                <button class="secondary" onclick="downloadFigure()" style="margin-left: 10px; padding: 12px 24px;">Download PNG</button>
+            </div>
         </div>
 
         <div class="panel">
@@ -94,50 +140,50 @@
     </div>
 
     <script>
-        // --- State Management ---
-        let gridConfig = { cols: 0, rows: 0, hasMerge: true };
+        // --- State ---
+        let gridState = { cols: 0, rows: 0 };
 
-        // --- 1. Build the Input Grid ---
+        // --- 1. Build Grid UI ---
         function buildGridUI() {
             const cols = parseInt(document.getElementById('num-cols').value);
             const rows = parseInt(document.getElementById('num-rows').value);
-            const hasMerge = document.getElementById('include-merge').checked;
-            gridConfig = { cols, rows, hasMerge };
+            gridState = { cols, rows };
 
             const container = document.getElementById('dynamic-grid');
-            container.innerHTML = ''; // Clear previous
+            container.innerHTML = ''; 
             
-            // CSS Grid Template: Label Column + N Data Columns
-            container.style.gridTemplateColumns = `150px repeat(${cols}, 1fr)`;
+            // Grid Template: Label Col + N Data Cols
+            container.style.gridTemplateColumns = `180px repeat(${cols}, 1fr)`;
 
-            // -- Header Row --
-            // Empty top-left
-            container.appendChild(createDiv(''));
-            // Column Labels
+            // Headers
+            container.appendChild(createDiv('')); // Top-left spacer
             for (let c = 0; c < cols; c++) {
                 const input = document.createElement('input');
                 input.type = 'text';
-                input.value = c === 0 ? "Naive" : (c === 1 ? "6h" : (c===2 ? "24h" : "7d")); // Defaults
+                input.value = c === 0 ? "Naive" : (c === 1 ? "6h" : (c===2 ? "24h" : "7d"));
                 input.id = `lbl-col-${c}`;
                 input.style.textAlign = "center";
+                input.style.fontWeight = "bold";
                 container.appendChild(input);
             }
 
-            // -- Channel Rows --
+            // Channel Rows
             const defaultColors = ['green', 'red', 'blue', 'magenta', 'cyan'];
             const defaultNames = ['p-AKT', 'tdTom', 'DAPI', 'Marker', 'Marker'];
 
             for (let r = 0; r < rows; r++) {
-                // 1. Row Configuration (Label + Color)
+                // Row Config
                 const configDiv = document.createElement('div');
                 configDiv.style.display = 'flex';
                 configDiv.style.gap = '5px';
+                configDiv.style.alignItems = 'center';
                 
                 const nameInput = document.createElement('input');
                 nameInput.type = 'text';
                 nameInput.value = defaultNames[r] || `Ch ${r+1}`;
                 nameInput.id = `lbl-row-${r}`;
-                nameInput.style.width = "70px";
+                nameInput.style.flex = "1";
+                nameInput.style.textAlign = "right";
 
                 const colorSelect = document.createElement('select');
                 colorSelect.id = `color-row-${r}`;
@@ -148,43 +194,29 @@
                     if(color === defaultColors[r]) opt.selected = true;
                     colorSelect.appendChild(opt);
                 });
-                colorSelect.style.width = "70px";
+                colorSelect.style.width = "80px";
 
                 configDiv.appendChild(nameInput);
                 configDiv.appendChild(colorSelect);
                 container.appendChild(configDiv);
 
-                // 2. File Inputs
+                // File Inputs
                 for (let c = 0; c < cols; c++) {
                     const drop = document.createElement('div');
                     drop.className = 'file-drop';
-                    drop.innerHTML = `<span>Select File</span><input type="file" id="file-${r}-${c}" onchange="markFile(this)">`;
+                    drop.innerHTML = `<span>Drag TIF/PNG here</span><input type="file" id="file-${r}-${c}" onchange="markFile(this)">`;
                     container.appendChild(drop);
                 }
             }
 
-            // -- Merge Row (Label Only, Logic is auto) --
-            if (hasMerge) {
-                const label = createDiv('Merged');
-                label.style.fontWeight = 'bold';
-                label.style.textAlign = 'right';
-                label.style.paddingRight = '10px';
-                container.appendChild(label);
-                
-                // Placeholders for visual alignment
-                for(let c=0; c<cols; c++) {
-                    container.appendChild(createDiv('(Auto-generated)', 'font-size:10px; color:#999; text-align:center;'));
-                }
-            }
-
             document.getElementById('grid-panel').style.display = 'block';
+            document.getElementById('options-panel').style.display = 'block';
         }
 
-        // Helper
-        function createDiv(text, style='') {
+        // --- Helpers ---
+        function createDiv(text) {
             const d = document.createElement('div');
             d.innerHTML = text;
-            d.style.cssText = style;
             return d;
         }
         function markFile(input) {
@@ -194,23 +226,15 @@
             }
         }
 
-        // --- 2. Image Processing ---
-
-        // Map colors to RGB multipliers
+        // --- 2. Generation Logic ---
         const COLOR_MAP = {
-            'green':   [0, 1, 0],
-            'red':     [1, 0, 0],
-            'blue':    [0, 0, 1],
-            'magenta': [1, 0, 1],
-            'cyan':    [0, 1, 1],
-            'yellow':  [1, 1, 0],
-            'gray':    [1, 1, 1]
+            'green':   [0, 1, 0], 'red':     [1, 0, 0], 'blue':    [0, 0, 1],
+            'magenta': [1, 0, 1], 'cyan':    [0, 1, 1], 'yellow':  [1, 1, 0], 'gray':    [1, 1, 1]
         };
 
         async function getPixels(fileInputId) {
             const input = document.getElementById(fileInputId);
             if (!input || !input.files || !input.files[0]) return null;
-            
             const file = input.files[0];
             const buffer = await file.arrayBuffer();
 
@@ -234,99 +258,107 @@
         }
 
         async function generateFigure() {
-            const msg = document.getElementById('loading-msg');
-            msg.style.display = 'inline';
-            
-            // Give UI a moment to render the loading text
-            await new Promise(r => setTimeout(r, 50));
+            document.getElementById('loading-msg').style.display = 'inline';
+            await new Promise(r => setTimeout(r, 50)); // Render delay
 
             try {
-                const cols = gridConfig.cols;
-                const rows = gridConfig.rows;
-                const hasMerge = gridConfig.hasMerge;
+                const cols = gridState.cols;
+                const rows = gridState.rows;
+                const includeMerge = document.getElementById('include-merge').checked;
 
-                // Determine Base Size from first valid image
+                // Read Appearance Settings
+                const fsHeader = parseInt(document.getElementById('fs-header').value) || 32;
+                const fsLabel = parseInt(document.getElementById('fs-label').value) || 24;
+                const sbColor = document.getElementById('sb-color').value;
+                const sbHeightPct = (parseFloat(document.getElementById('sb-height').value) || 2) / 100;
+
+                // 1. Find dimensions
                 let baseW = 300, baseH = 300;
-                // Find first file
+                let found = false;
                 for(let r=0; r<rows; r++) {
                     for(let c=0; c<cols; c++) {
                         const p = await getPixels(`file-${r}-${c}`);
-                        if(p) { baseW = p.w; baseH = p.h; break; }
+                        if(p) { baseW = p.w; baseH = p.h; found = true; break; }
                     }
+                    if(found) break;
                 }
 
                 const canvas = document.getElementById('mainCanvas');
                 const ctx = canvas.getContext('2d');
-                const pad = 10;
-                const headerH = 50;
+                const pad = Math.round(baseW * 0.02); // Responsive padding
+                const headerH = fsHeader * 2; // Responsive header space
+                const totalRows = includeMerge ? rows + 1 : rows;
 
-                const totalRows = hasMerge ? rows + 1 : rows;
                 canvas.width = (baseW * cols) + (pad * (cols - 1));
-                canvas.height = headerH + (baseH * totalRows) + (pad * (totalRows));
+                canvas.height = headerH + (baseH * totalRows) + (pad * totalRows);
 
-                // Background
                 ctx.fillStyle = "white";
                 ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-                // --- Draw Column Headers ---
+                // 2. Draw Column Headers
                 ctx.fillStyle = "black";
-                ctx.font = "bold 24px Arial";
+                // USE NEW FONT SIZE
+                ctx.font = `bold ${fsHeader}px Arial, sans-serif`;
                 ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
                 for (let c = 0; c < cols; c++) {
                     const label = document.getElementById(`lbl-col-${c}`).value;
                     const cx = (c * (baseW + pad)) + (baseW / 2);
-                    ctx.fillText(label, cx, 35);
+                    ctx.fillText(label, cx, headerH / 2);
                 }
 
-                // --- Process Grid ---
+                // 3. Process Images
                 for (let c = 0; c < cols; c++) {
                     const x = c * (baseW + pad);
-                    
-                    // Buffer for Merge Column
-                    let mergeBuffer = new Float32Array(baseW * baseH * 3); // RGB accumulator
+                    let mergeBuffer = new Float32Array(baseW * baseH * 3);
 
+                    // A. Individual Channels
                     for (let r = 0; r < rows; r++) {
                         const y = headerH + (r * (baseH + pad));
                         const rawData = await getPixels(`file-${r}-${c}`);
                         const colorName = document.getElementById(`color-row-${r}`).value;
-                        const multipliers = COLOR_MAP[colorName];
-
+                        const mult = COLOR_MAP[colorName];
                         const imgData = ctx.createImageData(baseW, baseH);
 
                         if (rawData) {
+                            // Simple auto-contrast based on max value in this specific image
+                            let maxVal = 1;
+                             for (let i = 0; i < rawData.data.length; i += 4) {
+                                 const val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
+                                 if(val > maxVal) maxVal = val;
+                             }
+                             const scaleFactor = 255.0 / maxVal;
+
+
                             for (let i = 0; i < imgData.data.length; i += 4) {
-                                // Greyscale intensity average
-                                const val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
-                                
-                                // Apply Color
-                                imgData.data[i]   = val * multipliers[0]; // R
-                                imgData.data[i+1] = val * multipliers[1]; // G
-                                imgData.data[i+2] = val * multipliers[2]; // B
+                                let val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
+                                val = val * scaleFactor; // Apply contrast stretch
+
+                                imgData.data[i]   = val * mult[0]; 
+                                imgData.data[i+1] = val * mult[1]; 
+                                imgData.data[i+2] = val * mult[2]; 
                                 imgData.data[i+3] = 255;
 
-                                // Add to merge buffer
-                                if (hasMerge) {
+                                if (includeMerge) {
                                     const pIdx = (i / 4) * 3;
                                     mergeBuffer[pIdx]   += imgData.data[i];
                                     mergeBuffer[pIdx+1] += imgData.data[i+1];
                                     mergeBuffer[pIdx+2] += imgData.data[i+2];
                                 }
                             }
+                        } else {
+                             // Fill black if missing
+                            for (let i = 0; i < imgData.data.length; i += 4) { imgData.data[i+3] = 255; }
                         }
-                        
                         ctx.putImageData(imgData, x, y);
-
-                        // Draw Row Label (Only first column)
-                        if (c === 0) {
-                            drawRowLabel(ctx, document.getElementById(`lbl-row-${r}`).value, x, y);
-                        }
+                        // USE NEW LABEL FONT SIZE
+                        if (c === 0) drawRowLabel(ctx, document.getElementById(`lbl-row-${r}`).value, x, y, fsLabel);
                     }
 
-                    // --- Draw Merge Row ---
-                    if (hasMerge) {
+                    // B. Merge Channel (Conditional)
+                    if (includeMerge) {
                         const y = headerH + (rows * (baseH + pad));
                         const mImg = ctx.createImageData(baseW, baseH);
-                        
                         for (let i = 0, p = 0; i < mImg.data.length; i += 4, p += 3) {
                             mImg.data[i]   = Math.min(255, mergeBuffer[p]);
                             mImg.data[i+1] = Math.min(255, mergeBuffer[p+1]);
@@ -334,62 +366,74 @@
                             mImg.data[i+3] = 255;
                         }
                         ctx.putImageData(mImg, x, y);
-
-                        if (c === 0) {
-                            drawRowLabel(ctx, "merged", x, y);
-                        }
+                        // USE NEW LABEL FONT SIZE
+                        if (c === 0) drawRowLabel(ctx, "merged", x, y, fsLabel);
                     }
                 }
 
-                // --- Scale Bar ---
+                // 4. Scale Bar (Updated appearance)
                 const scaleUm = parseFloat(document.getElementById('scale-um').value);
                 const pxPerUm = parseFloat(document.getElementById('px-per-um').value);
                 const barW = scaleUm * pxPerUm;
-                const barH = baseH * 0.02;
+                // USE NEW HEIGHT PERCENTAGE
+                const barH = baseH * sbHeightPct; 
                 
-                // Bottom-right coordinates
-                const finalY = headerH + ((hasMerge ? rows : rows-1) * (baseH + pad));
+                const finalY = headerH + ((totalRows - 1) * (baseH + pad));
                 const finalX = ((cols - 1) * (baseW + pad));
                 
-                ctx.fillStyle = "yellow"; // Scale bar color
-                ctx.fillRect(finalX + baseW - barW - (baseW*0.05), finalY + baseH - (baseH*0.1), barW, barH);
+                // USE NEW COLOR
+                ctx.fillStyle = sbColor;
+                ctx.fillRect(finalX + baseW - barW - (baseW*0.05), finalY + baseH - barH - (baseH*0.05), barW, barH);
 
-                // --- Figure Label (B) ---
+                // 5. Figure Label (Updated Font Size)
                 const figLabel = document.getElementById('fig-label').value;
                 if(figLabel) {
                     ctx.fillStyle = "black";
-                    ctx.font = "bold 40px Arial";
+                    // Make figure label slightly larger than headers
+                    ctx.font = `bold ${fsHeader * 1.2}px Arial, sans-serif`; 
                     ctx.textAlign = "left";
-                    ctx.fillText(figLabel, 0, 35);
+                    ctx.textBaseline = "top";
+                    ctx.fillText(figLabel, 0, 0);
                 }
 
             } catch (e) {
                 console.error(e);
-                alert("Error generating figure. Check console for details.");
+                alert("Error: " + e.message);
             }
-            msg.style.display = 'none';
+            document.getElementById('loading-msg').style.display = 'none';
         }
 
-        function drawRowLabel(ctx, text, x, y) {
+        // Updated to accept font size
+        function drawRowLabel(ctx, text, x, y, fontSize) {
             ctx.save();
             ctx.fillStyle = "white";
-            ctx.font = "bold 20px Arial";
+            // USE NEW FONT SIZE
+            ctx.font = `bold ${fontSize}px Arial, sans-serif`;
             ctx.shadowColor = "black";
-            ctx.shadowBlur = 4;
+            // Make shadow relative to font size
+            ctx.shadowBlur = fontSize / 5;
+            ctx.shadowOffsetX = fontSize / 15; 
+            ctx.shadowOffsetY = fontSize / 15;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            ctx.fillText(text, x + 15, y + 15);
+            const padding = baseW * 0.05; // Relative padding
+            ctx.fillText(text, x + padding, y + padding);
             ctx.restore();
         }
 
         function downloadFigure() {
             const link = document.createElement('a');
             link.download = 'scientific_figure.png';
-            link.href = document.getElementById('mainCanvas').toDataURL();
+            // Use better quality JPG for very large canvas if PNG fails, otherwise PNG
+            try {
+                 link.href = document.getElementById('mainCanvas').toDataURL("image/png");
+            } catch(e) {
+                 link.href = document.getElementById('mainCanvas').toDataURL("image/jpeg", 0.9);
+            }
             link.click();
         }
-        
-        // Initialize
+
+        // Init with default
         buildGridUI();
     </script>
 </body>
