@@ -16,9 +16,7 @@
 
         /* Configuration Flex layout */
         .config-row { display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
-        .config-section { border-right: 1px solid #eee; padding-right: 15px; margin-right: 5px; display: flex; gap: 15px; }
-        .config-section:last-child { border-right: none; }
-
+        
         .input-group { display: flex; flex-direction: column; gap: 5px; }
         .input-group label { font-size: 12px; font-weight: bold; color: #64748b; }
         
@@ -64,7 +62,14 @@
                     <label>Rows (Channels)</label>
                     <input type="number" id="num-rows" value="2" min="1" max="6" style="width:60px">
                 </div>
-                <button class="destructive" onclick="buildGridUI()">Reset & Create Grid</button>
+                <div class="input-group">
+                    <label>Layout Options</label>
+                    <div class="toggle-wrapper">
+                        <input type="checkbox" id="include-merge" checked> 
+                        <span style="font-size:13px; font-weight:600; color: #475569;">Include Merge Row</span>
+                    </div>
+                </div>
+                <button class="destructive" onclick="buildGridUI()" style="margin-left: auto;">Reset & Create Grid</button>
             </div>
         </div>
 
@@ -80,13 +85,6 @@
                 <div style="flex: 1;">
                     <h3>Layout & Scale</h3>
                     <div class="config-row">
-                        <div class="input-group">
-                            <label>Merge Row</label>
-                            <div class="toggle-wrapper">
-                                <input type="checkbox" id="include-merge" checked> 
-                                <span style="font-size:13px; font-weight:600; color: #475569;">Include</span>
-                            </div>
-                        </div>
                         <div class="input-group">
                             <label>Scale Bar (µm)</label>
                             <input type="number" id="scale-um" value="100" style="width:70px">
@@ -152,8 +150,8 @@
             const container = document.getElementById('dynamic-grid');
             container.innerHTML = ''; 
             
-            // Grid Template: Label Col + N Data Cols
-            container.style.gridTemplateColumns = `180px repeat(${cols}, 1fr)`;
+            // FIXED: Widen first column to 260px to prevent overlay/cramping
+            container.style.gridTemplateColumns = `260px repeat(${cols}, 1fr)`;
 
             // Headers
             container.appendChild(createDiv('')); // Top-left spacer
@@ -285,8 +283,8 @@
 
                 const canvas = document.getElementById('mainCanvas');
                 const ctx = canvas.getContext('2d');
-                const pad = Math.round(baseW * 0.02); // Responsive padding
-                const headerH = fsHeader * 2; // Responsive header space
+                const pad = Math.round(baseW * 0.02); 
+                const headerH = fsHeader * 2; 
                 const totalRows = includeMerge ? rows + 1 : rows;
 
                 canvas.width = (baseW * cols) + (pad * (cols - 1));
@@ -297,7 +295,6 @@
 
                 // 2. Draw Column Headers
                 ctx.fillStyle = "black";
-                // USE NEW FONT SIZE
                 ctx.font = `bold ${fsHeader}px Arial, sans-serif`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
@@ -321,7 +318,6 @@
                         const imgData = ctx.createImageData(baseW, baseH);
 
                         if (rawData) {
-                            // Simple auto-contrast based on max value in this specific image
                             let maxVal = 1;
                              for (let i = 0; i < rawData.data.length; i += 4) {
                                  const val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
@@ -329,10 +325,9 @@
                              }
                              const scaleFactor = 255.0 / maxVal;
 
-
                             for (let i = 0; i < imgData.data.length; i += 4) {
                                 let val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
-                                val = val * scaleFactor; // Apply contrast stretch
+                                val = val * scaleFactor;
 
                                 imgData.data[i]   = val * mult[0]; 
                                 imgData.data[i+1] = val * mult[1]; 
@@ -347,15 +342,14 @@
                                 }
                             }
                         } else {
-                             // Fill black if missing
                             for (let i = 0; i < imgData.data.length; i += 4) { imgData.data[i+3] = 255; }
                         }
                         ctx.putImageData(imgData, x, y);
-                        // USE NEW LABEL FONT SIZE
+                        
                         if (c === 0) drawRowLabel(ctx, document.getElementById(`lbl-row-${r}`).value, x, y, fsLabel);
                     }
 
-                    // B. Merge Channel (Conditional)
+                    // B. Merge Channel
                     if (includeMerge) {
                         const y = headerH + (rows * (baseH + pad));
                         const mImg = ctx.createImageData(baseW, baseH);
@@ -366,30 +360,27 @@
                             mImg.data[i+3] = 255;
                         }
                         ctx.putImageData(mImg, x, y);
-                        // USE NEW LABEL FONT SIZE
+                        
                         if (c === 0) drawRowLabel(ctx, "merged", x, y, fsLabel);
                     }
                 }
 
-                // 4. Scale Bar (Updated appearance)
+                // 4. Scale Bar
                 const scaleUm = parseFloat(document.getElementById('scale-um').value);
                 const pxPerUm = parseFloat(document.getElementById('px-per-um').value);
                 const barW = scaleUm * pxPerUm;
-                // USE NEW HEIGHT PERCENTAGE
                 const barH = baseH * sbHeightPct; 
                 
                 const finalY = headerH + ((totalRows - 1) * (baseH + pad));
                 const finalX = ((cols - 1) * (baseW + pad));
                 
-                // USE NEW COLOR
                 ctx.fillStyle = sbColor;
                 ctx.fillRect(finalX + baseW - barW - (baseW*0.05), finalY + baseH - barH - (baseH*0.05), barW, barH);
 
-                // 5. Figure Label (Updated Font Size)
+                // 5. Figure Label
                 const figLabel = document.getElementById('fig-label').value;
                 if(figLabel) {
                     ctx.fillStyle = "black";
-                    // Make figure label slightly larger than headers
                     ctx.font = `bold ${fsHeader * 1.2}px Arial, sans-serif`; 
                     ctx.textAlign = "left";
                     ctx.textBaseline = "top";
@@ -403,20 +394,17 @@
             document.getElementById('loading-msg').style.display = 'none';
         }
 
-        // Updated to accept font size
         function drawRowLabel(ctx, text, x, y, fontSize) {
             ctx.save();
             ctx.fillStyle = "white";
-            // USE NEW FONT SIZE
             ctx.font = `bold ${fontSize}px Arial, sans-serif`;
             ctx.shadowColor = "black";
-            // Make shadow relative to font size
             ctx.shadowBlur = fontSize / 5;
             ctx.shadowOffsetX = fontSize / 15; 
             ctx.shadowOffsetY = fontSize / 15;
             ctx.textAlign = "left";
             ctx.textBaseline = "top";
-            const padding = baseW * 0.05; // Relative padding
+            const padding = 20; 
             ctx.fillText(text, x + padding, y + padding);
             ctx.restore();
         }
@@ -424,7 +412,6 @@
         function downloadFigure() {
             const link = document.createElement('a');
             link.download = 'scientific_figure.png';
-            // Use better quality JPG for very large canvas if PNG fails, otherwise PNG
             try {
                  link.href = document.getElementById('mainCanvas').toDataURL("image/png");
             } catch(e) {
@@ -433,7 +420,7 @@
             link.click();
         }
 
-        // Init with default
+        // Init
         buildGridUI();
     </script>
 </body>
