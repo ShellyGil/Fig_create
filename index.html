@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scientific Figure Generator</title>
+    <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
+    <style>
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; }
+        
+        h1 { margin-bottom: 10px; }
+        .controls { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        
+        .grid-setup { display: grid; grid-template-columns: 100px repeat(4, 1fr); gap: 10px; align-items: center; margin-bottom: 20px; }
+        .col-header { font-weight: bold; text-align: center; }
+        .row-label { font-weight: bold; }
+        
+        input[type="file"] { width: 100%; font-size: 12px; }
+        input[type="text"] { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
+        
+        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button:hover { opacity: 0.9; }
+        button.secondary { background: #64748b; margin-left: 10px; }
+
+        #canvas-container { overflow: auto; text-align: center; border: 1px solid #ccc; background: white; padding: 20px; margin-top: 20px; }
+        canvas { max-width: 100%; height: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        
+        .loading { color: var(--primary); font-weight: bold; display: none; }
+    </style>
+</head>
+<body>
+
+    <h1>Microscopy Figure Generator</h1>
+    <p>Upload your .tif (or png/jpg) files below to generate the composite figure.</p>
+
+    <div class="controls">
+        <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+            <label><strong>Column Labels:</strong></label> <br>
+            <input type="text" id="lbl-col1" value="Naive" style="width:60px">
+            <input type="text" id="lbl-col2" value="6h" style="width:60px">
+            <input type="text" id="lbl-col3" value="24h" style="width:60px">
+            <input type="text" id="lbl-col4" value="7d" style="width:60px">
+            <span style="margin: 0 15px;">|</span>
+            <label>Scale Bar (µm): <input type="number" id="scale-um" value="100" style="width:50px"></label>
+            <label>Px/µm: <input type="number" id="px-per-um" value="2.5" style="width:50px"></label>
+        </div>
+
+        <div class="grid-setup">
+            <div></div>
+            <div class="col-header">Col 1</div>
+            <div class="col-header">Col 2</div>
+            <div class="col-header">Col 3</div>
+            <div class="col-header">Col 4</div>
+
+            <div class="row-label">Green (p-AKT)</div>
+            <input type="file" id="g1"> <input type="file" id="g2"> <input type="file" id="g3"> <input type="file" id="g4">
+
+            <div class="row-label">Red (tdTom)</div>
+            <input type="file" id="r1"> <input type="file" id="r2"> <input type="file" id="r3"> <input type="file" id="r4">
+        </div>
+
+        <button onclick="generateFigure()">Generate Figure</button>
+        <button class="secondary" onclick="downloadFigure()">Download Image</button>
+        <span class="loading" id="loading-msg">Processing...</span>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="mainCanvas"></canvas>
+    </div>
+
+    <script>
+        async function getPixels(fileInput) {
+            if (!fileInput.files || !fileInput.files[0]) return null;
+            const file = fileInput.files[0];
+            const arrayBuffer = await file.arrayBuffer();
+
+            // Handle TIF
+            if (file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
+                const ifds = UTIF.decode(arrayBuffer);
+                UTIF.decodeImage(arrayBuffer, ifds[0]);
+                const rgba = UTIF.toRGBA8(ifds[0]);
+                return { width: ifds[0].width, height: ifds[0].height, data: rgba };
+            } 
+            // Handle PNG/JPG
+            else {
+                return new Promise((resolve) => {
+                    const img = new Image();
+                    img.onload = () => {
+                        const c = document.createElement('canvas');
+                        c.width = img.width; c.height = img.height;
+                        const ctx = c.getContext('2d');
+                        ctx.drawImage(img, 0, 0);
+                        const imgData = ctx.getImageData(0,0, img.width, img.height);
+                        resolve({ width: img.width, height: img.height, data: imgData.data });
+                    };
+                    img.src = URL.createObjectURL(file);
+                });
+            }
+        }
+
+        function normalizeContrast(data) {
+            // Simple auto-contrast: Find max value and scale
+            let max = 0;
+            for(let i=0; i<data.length; i+=4) {
+                // Average RGB for intensity in case input is already colored
+                const val = (data[i] + data[i+1] + data[i+2]) / 3;
+                if(val > max) max = val;
+            }
+            if(max === 0) return data;
+            
+            const scale = 255 / max;
+            for(let i=0; i<data.length; i+=4) {
+                data[i]   = Math.min(255, data[i] * scale);
+                data[i+1] = Math.min(255, data[i+1] * scale);
+                data[i+2] = Math.min(255, data[i+2] * scale);
+            }
+            return data;
+        }
+
+        async function generateFigure() {
+            document.getElementById('loading-msg').style.display = 'inline';
+            const canvas = document.getElementById('mainCanvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Collect Inputs
+            const cols = 4;
+            const greenInputs = ['g1','g2','g3','g4'];
+            const redInputs = ['r1','r2','r3','r4'];
+            const colLabels = [
+                document.getElementById('lbl-col1').value,
+                document.getElementById('lbl-col2').value,
+                document.getElementById('lbl-col3').value,
+                document.getElementById('lbl-col4').value
+            ];
+
+            // Load one image to determine dimensions
+            // (Assumes all images are same size as per scientific standard)
+            let baseW = 300, baseH = 200; 
+            const firstFile = await getPixels(document.getElementById('g1'));
+            if(firstFile) { baseW = firstFile.width; baseH = firstFile.height; }
+
+            // Layout Config
+            const pad = 10;
+            const textHeaderH = 50;
+            const labelW = 0; // We will put labels inside images like the example
+            
+            canvas.width = (baseW * cols) + (pad * (cols-1));
+            canvas.height = (baseH * 3) + (pad * 2) + textHeaderH;
+            
+            // Fill Background White
+            ctx.fillStyle = "white";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Draw Column Headers
+            ctx.fillStyle = "black";
+            ctx.font = "bold 24px Arial";
+            ctx.textAlign = "center";
+            for(let i=0; i<cols; i++) {
+                const x = (i * (baseW + pad)) + (baseW / 2);
+                ctx.fillText(colLabels[i], x, 35);
+            }
+
+            // Loop through columns
+            for (let i = 0; i < cols; i++) {
+                const x = i * (baseW + pad);
+                
+                // Get Green Data
+                let gData = await getPixels(document.getElementById(greenInputs[i]));
+                // Get Red Data
+                let rData = await getPixels(document.getElementById(redInputs[i]));
+
+                // Buffers for final RGB
+                const gImg = ctx.createImageData(baseW, baseH);
+                const rImg = ctx.createImageData(baseW, baseH);
+                const mImg = ctx.createImageData(baseW, baseH);
+
+                // Helper to get intensity at pixel j
+                // If no file uploaded, return 0
+                const getVal = (source, j) => source ? (source.data[j] + source.data[j+1] + source.data[j+2])/3 : 0;
+
+                // Process Pixels
+                if(gData || rData) {
+                    for (let j = 0; j < gImg.data.length; j += 4) {
+                        // Intensity (0-255)
+                        // If normalize is needed, we could do it here, but raw data is safer
+                        let gVal = gData ? getVal(gData, j) : 0;
+                        let rVal = rData ? getVal(rData, j) : 0;
+
+                        // 1. Create Green Image
+                        gImg.data[j] = 0;     // R
+                        gImg.data[j+1] = gVal; // G
+                        gImg.data[j+2] = 0;   // B
+                        gImg.data[j+3] = 255; // Alpha
+
+                        // 2. Create Red Image
+                        rImg.data[j] = rVal;   // R
+                        rImg.data[j+1] = 0;    // G
+                        rImg.data[j+2] = 0;    // B
+                        rImg.data[j+3] = 255;  // Alpha
+
+                        // 3. Create Merge (Additive)
+                        mImg.data[j] = rVal;   // R
+                        mImg.data[j+1] = gVal; // G
+                        mImg.data[j+2] = 0;    // B
+                        mImg.data[j+3] = 255;  // Alpha
+                    }
+                }
+
+                // Draw to Canvas
+                // Row 1: Green
+                ctx.putImageData(gImg, x, textHeaderH);
+                // Row 2: Red
+                ctx.putImageData(rImg, x, textHeaderH + baseH + pad);
+                // Row 3: Merge
+                ctx.putImageData(mImg, x, textHeaderH + (baseH*2) + (pad*2));
+
+                // Add Row Labels (only on first column)
+                if(i === 0) {
+                    ctx.fillStyle = "white";
+                    ctx.font = "bold 20px Arial";
+                    ctx.textAlign = "left";
+                    const paddingX = 15; 
+                    const paddingY = 30;
+                    ctx.fillText("p-AKT", x + paddingX, textHeaderH + paddingY);
+                    ctx.fillText("tdTom", x + paddingX, textHeaderH + baseH + pad + paddingY);
+                    ctx.fillText("merged", x + paddingX, textHeaderH + (baseH*2) + (pad*2) + paddingY);
+                }
+            }
+
+            // Draw Scale Bar (Bottom Right)
+            const um = parseFloat(document.getElementById('scale-um').value);
+            const pxPerUm = parseFloat(document.getElementById('px-per-um').value);
+            const barW = um * pxPerUm;
+            const barH = baseH * 0.02; // 2% of image height
+            
+            // Coords for bottom right image
+            const lastX = (3 * (baseW + pad));
+            const lastY = textHeaderH + (baseH*2) + (pad*2);
+            
+            ctx.fillStyle = "yellow";
+            ctx.fillRect(lastX + baseW - barW - (baseW*0.05), lastY + baseH - (baseH*0.1), barW, barH);
+
+            // Add "B" Label
+            ctx.fillStyle = "black";
+            ctx.font = "bold 40px Arial";
+            ctx.fillText("B", 10, 30);
+
+            document.getElementById('loading-msg').style.display = 'none';
+        }
+
+        function downloadFigure() {
+            const link = document.createElement('a');
+            link.download = 'figure_output.png';
+            link.href = document.getElementById('mainCanvas').toDataURL();
+            link.click();
+        }
+    </script>
+</body>
+</html>
