@@ -3,258 +3,394 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scientific Figure Generator</title>
+    <title>Dynamic Figure Generator</title>
     <script src="https://cdn.jsdelivr.net/npm/utif@3.1.0/UTIF.js"></script>
     <style>
-        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; }
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1200px; margin: 0 auto; }
+        :root { --primary: #2563eb; --bg: #f8fafc; --text: #1e293b; --border: #e2e8f0; }
+        body { font-family: -apple-system, system-ui, sans-serif; background: var(--bg); color: var(--text); padding: 20px; max-width: 1400px; margin: 0 auto; }
         
-        h1 { margin-bottom: 10px; }
-        .controls { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 20px; }
+        /* Layout */
+        .app-container { display: flex; gap: 20px; flex-direction: column; }
+        .panel { background: white; padding: 20px; border-radius: 8px; border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         
-        .grid-setup { display: grid; grid-template-columns: 100px repeat(4, 1fr); gap: 10px; align-items: center; margin-bottom: 20px; }
-        .col-header { font-weight: bold; text-align: center; }
-        .row-label { font-weight: bold; }
+        /* Setup Controls */
+        .config-row { display: flex; gap: 15px; align-items: center; margin-bottom: 15px; flex-wrap: wrap; }
+        .input-group { display: flex; flex-direction: column; gap: 5px; }
+        .input-group label { font-size: 12px; font-weight: bold; color: #64748b; }
+        input[type="number"], input[type="text"], select { padding: 6px; border: 1px solid #cbd5e1; border-radius: 4px; }
         
-        input[type="file"] { width: 100%; font-size: 12px; }
-        input[type="text"] { width: 90%; padding: 5px; border: 1px solid #ccc; border-radius: 4px; text-align: center; }
-        
-        button { background: var(--primary); color: white; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        button { background: var(--primary); color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-weight: 600; }
         button:hover { opacity: 0.9; }
-        button.secondary { background: #64748b; margin-left: 10px; }
-
-        #canvas-container { overflow: auto; text-align: center; border: 1px solid #ccc; background: white; padding: 20px; margin-top: 20px; }
-        canvas { max-width: 100%; height: auto; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        button.secondary { background: #64748b; }
         
-        .loading { color: var(--primary); font-weight: bold; display: none; }
+        /* The Grid */
+        #dynamic-grid { display: grid; gap: 10px; margin-top: 20px; align-items: center; }
+        .file-drop { border: 2px dashed #cbd5e1; padding: 10px; text-align: center; border-radius: 4px; font-size: 11px; cursor: pointer; background: #fdfdfd; transition: 0.2s; position: relative; overflow: hidden; }
+        .file-drop:hover { border-color: var(--primary); background: #eff6ff; }
+        .file-drop input { opacity: 0; position: absolute; top:0; left:0; width:100%; height:100%; cursor: pointer; }
+        .file-drop.has-file { background: #dcfce7; border-color: #22c55e; border-style: solid; }
+
+        /* Canvas */
+        #canvas-wrapper { overflow: auto; text-align: center; background: #eee; padding: 20px; border-radius: 4px; min-height: 300px; display: flex; align-items: center; justify-content: center; }
+        canvas { box-shadow: 0 4px 6px rgba(0,0,0,0.1); max-width: 100%; }
+
+        .loading { display: none; margin-left: 10px; color: var(--primary); font-weight: bold; }
     </style>
 </head>
 <body>
 
-    <h1>Microscopy Figure Generator</h1>
-    <p>Upload your .tif (or png/jpg) files below to generate the composite figure.</p>
+    <div class="app-container">
+        <div class="panel">
+            <h2 style="margin-top:0">1. Figure Layout</h2>
+            <div class="config-row">
+                <div class="input-group">
+                    <label>Columns (Time)</label>
+                    <input type="number" id="num-cols" value="4" min="1" max="8" style="width:60px">
+                </div>
+                <div class="input-group">
+                    <label>Rows (Channels)</label>
+                    <input type="number" id="num-rows" value="2" min="1" max="6" style="width:60px">
+                </div>
+                <div class="input-group">
+                    <label>Options</label>
+                    <div style="display:flex; align-items:center; gap:5px; height: 30px;">
+                        <input type="checkbox" id="include-merge" checked> <span style="font-size:14px">Include Merge Row</span>
+                    </div>
+                </div>
+                <button onclick="buildGridUI()">Update Grid</button>
+            </div>
 
-    <div class="controls">
-        <div style="margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
-            <label><strong>Column Labels:</strong></label> <br>
-            <input type="text" id="lbl-col1" value="Naive" style="width:60px">
-            <input type="text" id="lbl-col2" value="6h" style="width:60px">
-            <input type="text" id="lbl-col3" value="24h" style="width:60px">
-            <input type="text" id="lbl-col4" value="7d" style="width:60px">
-            <span style="margin: 0 15px;">|</span>
-            <label>Scale Bar (µm): <input type="number" id="scale-um" value="100" style="width:50px"></label>
-            <label>Px/µm: <input type="number" id="px-per-um" value="2.5" style="width:50px"></label>
+            <div class="config-row" style="border-top: 1px solid #eee; padding-top: 15px;">
+                <div class="input-group">
+                    <label>Scale Bar (µm)</label>
+                    <input type="number" id="scale-um" value="100" style="width:80px">
+                </div>
+                <div class="input-group">
+                    <label>Px per µm</label>
+                    <input type="number" id="px-per-um" value="2.5" style="width:80px">
+                </div>
+                <div class="input-group">
+                    <label>Figure Label</label>
+                    <input type="text" id="fig-label" value="B" style="width:50px">
+                </div>
+                <div style="margin-left: auto;">
+                    <button onclick="generateFigure()">Generate Figure</button>
+                    <button class="secondary" onclick="downloadFigure()">Download PNG</button>
+                    <span id="loading-msg" class="loading">Processing...</span>
+                </div>
+            </div>
         </div>
 
-        <div class="grid-setup">
-            <div></div>
-            <div class="col-header">Col 1</div>
-            <div class="col-header">Col 2</div>
-            <div class="col-header">Col 3</div>
-            <div class="col-header">Col 4</div>
-
-            <div class="row-label">Green (p-AKT)</div>
-            <input type="file" id="g1"> <input type="file" id="g2"> <input type="file" id="g3"> <input type="file" id="g4">
-
-            <div class="row-label">Red (tdTom)</div>
-            <input type="file" id="r1"> <input type="file" id="r2"> <input type="file" id="r3"> <input type="file" id="r4">
+        <div class="panel" id="grid-panel" style="display:none;">
+            <h2 style="margin-top:0">2. Upload Data</h2>
+            <div id="dynamic-grid"></div>
         </div>
 
-        <button onclick="generateFigure()">Generate Figure</button>
-        <button class="secondary" onclick="downloadFigure()">Download Image</button>
-        <span class="loading" id="loading-msg">Processing...</span>
-    </div>
-
-    <div id="canvas-container">
-        <canvas id="mainCanvas"></canvas>
+        <div class="panel">
+            <div id="canvas-wrapper">
+                <canvas id="mainCanvas"></canvas>
+            </div>
+        </div>
     </div>
 
     <script>
-        async function getPixels(fileInput) {
-            if (!fileInput.files || !fileInput.files[0]) return null;
-            const file = fileInput.files[0];
-            const arrayBuffer = await file.arrayBuffer();
+        // --- State Management ---
+        let gridConfig = { cols: 0, rows: 0, hasMerge: true };
 
-            // Handle TIF
-            if (file.name.toLowerCase().endsWith('.tif') || file.name.toLowerCase().endsWith('.tiff')) {
-                const ifds = UTIF.decode(arrayBuffer);
-                UTIF.decodeImage(arrayBuffer, ifds[0]);
-                const rgba = UTIF.toRGBA8(ifds[0]);
-                return { width: ifds[0].width, height: ifds[0].height, data: rgba };
-            } 
-            // Handle PNG/JPG
-            else {
-                return new Promise((resolve) => {
+        // --- 1. Build the Input Grid ---
+        function buildGridUI() {
+            const cols = parseInt(document.getElementById('num-cols').value);
+            const rows = parseInt(document.getElementById('num-rows').value);
+            const hasMerge = document.getElementById('include-merge').checked;
+            gridConfig = { cols, rows, hasMerge };
+
+            const container = document.getElementById('dynamic-grid');
+            container.innerHTML = ''; // Clear previous
+            
+            // CSS Grid Template: Label Column + N Data Columns
+            container.style.gridTemplateColumns = `150px repeat(${cols}, 1fr)`;
+
+            // -- Header Row --
+            // Empty top-left
+            container.appendChild(createDiv(''));
+            // Column Labels
+            for (let c = 0; c < cols; c++) {
+                const input = document.createElement('input');
+                input.type = 'text';
+                input.value = c === 0 ? "Naive" : (c === 1 ? "6h" : (c===2 ? "24h" : "7d")); // Defaults
+                input.id = `lbl-col-${c}`;
+                input.style.textAlign = "center";
+                container.appendChild(input);
+            }
+
+            // -- Channel Rows --
+            const defaultColors = ['green', 'red', 'blue', 'magenta', 'cyan'];
+            const defaultNames = ['p-AKT', 'tdTom', 'DAPI', 'Marker', 'Marker'];
+
+            for (let r = 0; r < rows; r++) {
+                // 1. Row Configuration (Label + Color)
+                const configDiv = document.createElement('div');
+                configDiv.style.display = 'flex';
+                configDiv.style.gap = '5px';
+                
+                const nameInput = document.createElement('input');
+                nameInput.type = 'text';
+                nameInput.value = defaultNames[r] || `Ch ${r+1}`;
+                nameInput.id = `lbl-row-${r}`;
+                nameInput.style.width = "70px";
+
+                const colorSelect = document.createElement('select');
+                colorSelect.id = `color-row-${r}`;
+                ['green', 'red', 'blue', 'magenta', 'cyan', 'yellow', 'gray'].forEach(color => {
+                    const opt = document.createElement('option');
+                    opt.value = color;
+                    opt.text = color.charAt(0).toUpperCase() + color.slice(1);
+                    if(color === defaultColors[r]) opt.selected = true;
+                    colorSelect.appendChild(opt);
+                });
+                colorSelect.style.width = "70px";
+
+                configDiv.appendChild(nameInput);
+                configDiv.appendChild(colorSelect);
+                container.appendChild(configDiv);
+
+                // 2. File Inputs
+                for (let c = 0; c < cols; c++) {
+                    const drop = document.createElement('div');
+                    drop.className = 'file-drop';
+                    drop.innerHTML = `<span>Select File</span><input type="file" id="file-${r}-${c}" onchange="markFile(this)">`;
+                    container.appendChild(drop);
+                }
+            }
+
+            // -- Merge Row (Label Only, Logic is auto) --
+            if (hasMerge) {
+                const label = createDiv('Merged');
+                label.style.fontWeight = 'bold';
+                label.style.textAlign = 'right';
+                label.style.paddingRight = '10px';
+                container.appendChild(label);
+                
+                // Placeholders for visual alignment
+                for(let c=0; c<cols; c++) {
+                    container.appendChild(createDiv('(Auto-generated)', 'font-size:10px; color:#999; text-align:center;'));
+                }
+            }
+
+            document.getElementById('grid-panel').style.display = 'block';
+        }
+
+        // Helper
+        function createDiv(text, style='') {
+            const d = document.createElement('div');
+            d.innerHTML = text;
+            d.style.cssText = style;
+            return d;
+        }
+        function markFile(input) {
+            if(input.files && input.files[0]) {
+                input.parentElement.classList.add('has-file');
+                input.parentElement.querySelector('span').innerText = input.files[0].name;
+            }
+        }
+
+        // --- 2. Image Processing ---
+
+        // Map colors to RGB multipliers
+        const COLOR_MAP = {
+            'green':   [0, 1, 0],
+            'red':     [1, 0, 0],
+            'blue':    [0, 0, 1],
+            'magenta': [1, 0, 1],
+            'cyan':    [0, 1, 1],
+            'yellow':  [1, 1, 0],
+            'gray':    [1, 1, 1]
+        };
+
+        async function getPixels(fileInputId) {
+            const input = document.getElementById(fileInputId);
+            if (!input || !input.files || !input.files[0]) return null;
+            
+            const file = input.files[0];
+            const buffer = await file.arrayBuffer();
+
+            if (file.name.match(/\.tif+$/i)) {
+                const ifds = UTIF.decode(buffer);
+                UTIF.decodeImage(buffer, ifds[0]);
+                return { w: ifds[0].width, h: ifds[0].height, data: UTIF.toRGBA8(ifds[0]) };
+            } else {
+                return new Promise(resolve => {
                     const img = new Image();
                     img.onload = () => {
                         const c = document.createElement('canvas');
                         c.width = img.width; c.height = img.height;
                         const ctx = c.getContext('2d');
                         ctx.drawImage(img, 0, 0);
-                        const imgData = ctx.getImageData(0,0, img.width, img.height);
-                        resolve({ width: img.width, height: img.height, data: imgData.data });
+                        resolve({ w: img.width, h: img.height, data: ctx.getImageData(0,0,img.width,img.height).data });
                     };
                     img.src = URL.createObjectURL(file);
                 });
             }
         }
 
-        function normalizeContrast(data) {
-            // Simple auto-contrast: Find max value and scale
-            let max = 0;
-            for(let i=0; i<data.length; i+=4) {
-                // Average RGB for intensity in case input is already colored
-                const val = (data[i] + data[i+1] + data[i+2]) / 3;
-                if(val > max) max = val;
-            }
-            if(max === 0) return data;
-            
-            const scale = 255 / max;
-            for(let i=0; i<data.length; i+=4) {
-                data[i]   = Math.min(255, data[i] * scale);
-                data[i+1] = Math.min(255, data[i+1] * scale);
-                data[i+2] = Math.min(255, data[i+2] * scale);
-            }
-            return data;
-        }
-
         async function generateFigure() {
-            document.getElementById('loading-msg').style.display = 'inline';
-            const canvas = document.getElementById('mainCanvas');
-            const ctx = canvas.getContext('2d');
+            const msg = document.getElementById('loading-msg');
+            msg.style.display = 'inline';
             
-            // Collect Inputs
-            const cols = 4;
-            const greenInputs = ['g1','g2','g3','g4'];
-            const redInputs = ['r1','r2','r3','r4'];
-            const colLabels = [
-                document.getElementById('lbl-col1').value,
-                document.getElementById('lbl-col2').value,
-                document.getElementById('lbl-col3').value,
-                document.getElementById('lbl-col4').value
-            ];
+            // Give UI a moment to render the loading text
+            await new Promise(r => setTimeout(r, 50));
 
-            // Load one image to determine dimensions
-            // (Assumes all images are same size as per scientific standard)
-            let baseW = 300, baseH = 200; 
-            const firstFile = await getPixels(document.getElementById('g1'));
-            if(firstFile) { baseW = firstFile.width; baseH = firstFile.height; }
+            try {
+                const cols = gridConfig.cols;
+                const rows = gridConfig.rows;
+                const hasMerge = gridConfig.hasMerge;
 
-            // Layout Config
-            const pad = 10;
-            const textHeaderH = 50;
-            const labelW = 0; // We will put labels inside images like the example
-            
-            canvas.width = (baseW * cols) + (pad * (cols-1));
-            canvas.height = (baseH * 3) + (pad * 2) + textHeaderH;
-            
-            // Fill Background White
-            ctx.fillStyle = "white";
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // Draw Column Headers
-            ctx.fillStyle = "black";
-            ctx.font = "bold 24px Arial";
-            ctx.textAlign = "center";
-            for(let i=0; i<cols; i++) {
-                const x = (i * (baseW + pad)) + (baseW / 2);
-                ctx.fillText(colLabels[i], x, 35);
-            }
-
-            // Loop through columns
-            for (let i = 0; i < cols; i++) {
-                const x = i * (baseW + pad);
-                
-                // Get Green Data
-                let gData = await getPixels(document.getElementById(greenInputs[i]));
-                // Get Red Data
-                let rData = await getPixels(document.getElementById(redInputs[i]));
-
-                // Buffers for final RGB
-                const gImg = ctx.createImageData(baseW, baseH);
-                const rImg = ctx.createImageData(baseW, baseH);
-                const mImg = ctx.createImageData(baseW, baseH);
-
-                // Helper to get intensity at pixel j
-                // If no file uploaded, return 0
-                const getVal = (source, j) => source ? (source.data[j] + source.data[j+1] + source.data[j+2])/3 : 0;
-
-                // Process Pixels
-                if(gData || rData) {
-                    for (let j = 0; j < gImg.data.length; j += 4) {
-                        // Intensity (0-255)
-                        // If normalize is needed, we could do it here, but raw data is safer
-                        let gVal = gData ? getVal(gData, j) : 0;
-                        let rVal = rData ? getVal(rData, j) : 0;
-
-                        // 1. Create Green Image
-                        gImg.data[j] = 0;     // R
-                        gImg.data[j+1] = gVal; // G
-                        gImg.data[j+2] = 0;   // B
-                        gImg.data[j+3] = 255; // Alpha
-
-                        // 2. Create Red Image
-                        rImg.data[j] = rVal;   // R
-                        rImg.data[j+1] = 0;    // G
-                        rImg.data[j+2] = 0;    // B
-                        rImg.data[j+3] = 255;  // Alpha
-
-                        // 3. Create Merge (Additive)
-                        mImg.data[j] = rVal;   // R
-                        mImg.data[j+1] = gVal; // G
-                        mImg.data[j+2] = 0;    // B
-                        mImg.data[j+3] = 255;  // Alpha
+                // Determine Base Size from first valid image
+                let baseW = 300, baseH = 300;
+                // Find first file
+                for(let r=0; r<rows; r++) {
+                    for(let c=0; c<cols; c++) {
+                        const p = await getPixels(`file-${r}-${c}`);
+                        if(p) { baseW = p.w; baseH = p.h; break; }
                     }
                 }
 
-                // Draw to Canvas
-                // Row 1: Green
-                ctx.putImageData(gImg, x, textHeaderH);
-                // Row 2: Red
-                ctx.putImageData(rImg, x, textHeaderH + baseH + pad);
-                // Row 3: Merge
-                ctx.putImageData(mImg, x, textHeaderH + (baseH*2) + (pad*2));
+                const canvas = document.getElementById('mainCanvas');
+                const ctx = canvas.getContext('2d');
+                const pad = 10;
+                const headerH = 50;
 
-                // Add Row Labels (only on first column)
-                if(i === 0) {
-                    ctx.fillStyle = "white";
-                    ctx.font = "bold 20px Arial";
-                    ctx.textAlign = "left";
-                    const paddingX = 15; 
-                    const paddingY = 30;
-                    ctx.fillText("p-AKT", x + paddingX, textHeaderH + paddingY);
-                    ctx.fillText("tdTom", x + paddingX, textHeaderH + baseH + pad + paddingY);
-                    ctx.fillText("merged", x + paddingX, textHeaderH + (baseH*2) + (pad*2) + paddingY);
+                const totalRows = hasMerge ? rows + 1 : rows;
+                canvas.width = (baseW * cols) + (pad * (cols - 1));
+                canvas.height = headerH + (baseH * totalRows) + (pad * (totalRows));
+
+                // Background
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                // --- Draw Column Headers ---
+                ctx.fillStyle = "black";
+                ctx.font = "bold 24px Arial";
+                ctx.textAlign = "center";
+                for (let c = 0; c < cols; c++) {
+                    const label = document.getElementById(`lbl-col-${c}`).value;
+                    const cx = (c * (baseW + pad)) + (baseW / 2);
+                    ctx.fillText(label, cx, 35);
                 }
+
+                // --- Process Grid ---
+                for (let c = 0; c < cols; c++) {
+                    const x = c * (baseW + pad);
+                    
+                    // Buffer for Merge Column
+                    let mergeBuffer = new Float32Array(baseW * baseH * 3); // RGB accumulator
+
+                    for (let r = 0; r < rows; r++) {
+                        const y = headerH + (r * (baseH + pad));
+                        const rawData = await getPixels(`file-${r}-${c}`);
+                        const colorName = document.getElementById(`color-row-${r}`).value;
+                        const multipliers = COLOR_MAP[colorName];
+
+                        const imgData = ctx.createImageData(baseW, baseH);
+
+                        if (rawData) {
+                            for (let i = 0; i < imgData.data.length; i += 4) {
+                                // Greyscale intensity average
+                                const val = (rawData.data[i] + rawData.data[i+1] + rawData.data[i+2]) / 3;
+                                
+                                // Apply Color
+                                imgData.data[i]   = val * multipliers[0]; // R
+                                imgData.data[i+1] = val * multipliers[1]; // G
+                                imgData.data[i+2] = val * multipliers[2]; // B
+                                imgData.data[i+3] = 255;
+
+                                // Add to merge buffer
+                                if (hasMerge) {
+                                    const pIdx = (i / 4) * 3;
+                                    mergeBuffer[pIdx]   += imgData.data[i];
+                                    mergeBuffer[pIdx+1] += imgData.data[i+1];
+                                    mergeBuffer[pIdx+2] += imgData.data[i+2];
+                                }
+                            }
+                        }
+                        
+                        ctx.putImageData(imgData, x, y);
+
+                        // Draw Row Label (Only first column)
+                        if (c === 0) {
+                            drawRowLabel(ctx, document.getElementById(`lbl-row-${r}`).value, x, y);
+                        }
+                    }
+
+                    // --- Draw Merge Row ---
+                    if (hasMerge) {
+                        const y = headerH + (rows * (baseH + pad));
+                        const mImg = ctx.createImageData(baseW, baseH);
+                        
+                        for (let i = 0, p = 0; i < mImg.data.length; i += 4, p += 3) {
+                            mImg.data[i]   = Math.min(255, mergeBuffer[p]);
+                            mImg.data[i+1] = Math.min(255, mergeBuffer[p+1]);
+                            mImg.data[i+2] = Math.min(255, mergeBuffer[p+2]);
+                            mImg.data[i+3] = 255;
+                        }
+                        ctx.putImageData(mImg, x, y);
+
+                        if (c === 0) {
+                            drawRowLabel(ctx, "merged", x, y);
+                        }
+                    }
+                }
+
+                // --- Scale Bar ---
+                const scaleUm = parseFloat(document.getElementById('scale-um').value);
+                const pxPerUm = parseFloat(document.getElementById('px-per-um').value);
+                const barW = scaleUm * pxPerUm;
+                const barH = baseH * 0.02;
+                
+                // Bottom-right coordinates
+                const finalY = headerH + ((hasMerge ? rows : rows-1) * (baseH + pad));
+                const finalX = ((cols - 1) * (baseW + pad));
+                
+                ctx.fillStyle = "yellow"; // Scale bar color
+                ctx.fillRect(finalX + baseW - barW - (baseW*0.05), finalY + baseH - (baseH*0.1), barW, barH);
+
+                // --- Figure Label (B) ---
+                const figLabel = document.getElementById('fig-label').value;
+                if(figLabel) {
+                    ctx.fillStyle = "black";
+                    ctx.font = "bold 40px Arial";
+                    ctx.textAlign = "left";
+                    ctx.fillText(figLabel, 0, 35);
+                }
+
+            } catch (e) {
+                console.error(e);
+                alert("Error generating figure. Check console for details.");
             }
+            msg.style.display = 'none';
+        }
 
-            // Draw Scale Bar (Bottom Right)
-            const um = parseFloat(document.getElementById('scale-um').value);
-            const pxPerUm = parseFloat(document.getElementById('px-per-um').value);
-            const barW = um * pxPerUm;
-            const barH = baseH * 0.02; // 2% of image height
-            
-            // Coords for bottom right image
-            const lastX = (3 * (baseW + pad));
-            const lastY = textHeaderH + (baseH*2) + (pad*2);
-            
-            ctx.fillStyle = "yellow";
-            ctx.fillRect(lastX + baseW - barW - (baseW*0.05), lastY + baseH - (baseH*0.1), barW, barH);
-
-            // Add "B" Label
-            ctx.fillStyle = "black";
-            ctx.font = "bold 40px Arial";
-            ctx.fillText("B", 10, 30);
-
-            document.getElementById('loading-msg').style.display = 'none';
+        function drawRowLabel(ctx, text, x, y) {
+            ctx.save();
+            ctx.fillStyle = "white";
+            ctx.font = "bold 20px Arial";
+            ctx.shadowColor = "black";
+            ctx.shadowBlur = 4;
+            ctx.textAlign = "left";
+            ctx.textBaseline = "top";
+            ctx.fillText(text, x + 15, y + 15);
+            ctx.restore();
         }
 
         function downloadFigure() {
             const link = document.createElement('a');
-            link.download = 'figure_output.png';
+            link.download = 'scientific_figure.png';
             link.href = document.getElementById('mainCanvas').toDataURL();
             link.click();
         }
+        
+        // Initialize
+        buildGridUI();
     </script>
 </body>
 </html>
